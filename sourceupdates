@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Script to check repositories located in $HOME/tools which are tools installed from source if they have new release tags
+# Script to check tool repositories if they have new release tags. 
+# Repositories located in $HOME/tools are tools installed from source.
 
 RED='\033[0;31m'
 NC='\033[0m'

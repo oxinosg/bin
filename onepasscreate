@@ -1,7 +1,6 @@
 #!/bin/bash
 
-
-# Script to copy to clipboard password from 1password account
+# Script to create password and store in 1password account
 
 # Check if dependencies exist
 xclip -version >/dev/null || exit
