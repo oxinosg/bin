@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Script to check repositories located in $HOME/tools which are tools installed from source if they have new release tags
+
+RED='\033[0;31m'
+NC='\033[0m'
+
+declare -a array=(
+"emacs" 
+"neovim"
+"tmux"
+)
+
+log_new() {
+  status="$status$(printf "%-30s ${RED}%-30s %-30s${NC}" "$1" "$2" "$3")\n"
+}
+
+log() {
+  status="$status$(printf "%-30s %-30s %-30s" "$1" "$2" "$3")\n"
+}
+
+status="$(printf "%-30s %-30s %-30s" "Title" "Version" "Latest")\n\n"
+cd $HOME/tools
+
+total=$(find . -maxdepth 1 -type d -print | wc -l)
+count=0
+
+## to loop in all folders
+for f in *; do
+  if [ -d "$f" ]; then
+    ((count++))
+
+    # $f is a directory
+    cd "$f"
+    echo -ne "($count/$total) Checking $f for updates                     "\\r
+
+    if git rev-parse --git-dir >/dev/null 2>/dev/null; then
+      # fetch new tags
+      git fetch --tags 2>/dev/null
+      
+      # show current tag
+      current="$(git describe --tags 2>/dev/null)"
+      
+      if [[ " ${array[@]} " =~ " $f " ]]; then
+        # show latest tag safe (usually doesn't get nightly versions)
+        latest="$(git describe --abbrev=0 --tags)"
+      else
+        # get latest tag
+        latest="$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null)"
+      fi
+
+      if [[ ! -z "$current" ]]; then 
+        [[ "$current" = "$latest" ]] && log "$f" "$current" "$latest" || log_new "$f" "$current" "$latest"
+      fi
+    fi
+
+	  cd $HOME/tools
+  fi
+done
+
+echo -e "$status"

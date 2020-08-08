@@ -1,0 +1,42 @@
+#!/bin/bash
+
+
+# Script to copy to clipboard password from 1password account
+
+# Check if dependencies exist
+xclip -version >/dev/null || exit
+stvars >/dev/null || exit
+dmenu -v >/dev/null || exit # dmenu with password patch installed
+op -v >/dev/null || exit
+jq --version >/dev/null || exit
+
+token=$(stvars get onetoken)
+
+gettoken() {
+  key=$(dmenu -P -p "Enter master key" <&-)
+  
+  [[ -z "$key" ]] && exit
+  
+  token=$(op signin my -r <<< "$key")
+  stvars set onetoken "$token"
+}
+
+if [[ -z "$token" ]]; then
+  gettoken
+fi
+
+items=$(op list templates --session "$token" 2>&1)
+status=$(echo "$items" | grep "Invalid session token\|session expired")
+
+if [[ ! -z "$status" ]]; then
+  gettoken
+  items=$(op list templates --session "$token" 2>&1)
+fi
+
+chosen=$(echo "$items" | jq '.[].name' -r | dmenu -i -p "Select template to use")
+[[ -z "$chosen" ]] && exit
+
+title=$(dmenu -p "Enter title" <&-)
+create=$(op create item "$chosen" --title "$title" --session "$token" --generate-password 2>&1 | grep 'ERROR')
+
+[[ -z "$create" ]] && notify-send "✅ Item created." || notify-send "⚠️ $create"

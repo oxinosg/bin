@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Script to connect to wifi
+
+wifi=$(nmcli d wifi list | dmenu -i -wi 1400 -l 30 -p "Select wifi to connect" | sed 's/ \{2,\}/:/g' | cut -d : -f2)
+[[ -z "$wifi" ]] && exit
+
+password=$(dmenu -p "Enter wifi password" <&-)
+
+if [[ ! -z "$wifi" ]]; then
+  echo "$wifi"
+  connect=$(nmcli d wifi connect "$wifi" "$password")
+  notify-send "$connect"
+fi

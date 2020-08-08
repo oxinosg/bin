@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Script to connect to bluetooth device
+# TODO at some point should fix this one
+
+power=$(echo -e "On\nOff" | dmenu -i -p "Power on/off bluetooth")
+
+if [[ $power == "On" ]]; then
+  bluetoothctl -- power on
+
+  notify-send " Bluetooth enabled"
+
+  paired=$(bluetoothctl -- paired-devices)
+
+  # show list of paired devices and a "New" option
+  device=$(echo -e "New\n$paired" | dmenu -i -p "Select paired device to connect")
+  [[ -z "$device" ]] && exit
+
+  if [[ $device == "New" ]]; then
+    # scan for new devices
+    timeout 10s bluetoothctl -- scan on
+    bluetoothctl -- scan off
+    devices=$(bluetoothctl -- devices)
+    device=$(echo "$devices" | dmenu -i -wi 1400 -l 30 -p "Select device to connect")
+    [[ -z "$device" ]] && exit
+
+    bluetoothctl -- pair "$(echo "$device" | cut -d' ' -f2))"
+  fi
+
+  device_id=$(echo "$device" | cut -d' ' -f2)
+  status=$(bluetoothctl -- connect "$device_id")
+  echo "$status"
+  #(cmd &) | (timeout --foreground 2 cat; cat > /dev/null &)
+
+  [[ ! -z "$(echo "$status" | grep 'connected')" ]] && notify-send "🎧 Connection successful with: $device"
+elif [[ $power == "Off" ]]; then
+  bluetoothctl -- power off
+
+  notify-send " Bluetooth disabled"
+fi
