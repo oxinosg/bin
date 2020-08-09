@@ -1,8 +1,5 @@
 #!/bin/bash
 
-PASSWORD=false
-CASE_INSENSITIVELY=false
-
 # In case both applications are installed, you can set up a preference with
 # $DYNAMIC_MENU="dmenu"
 # $DYNAMIC_MENU="rofi"
@@ -38,7 +35,7 @@ rofiexists=$(exists "rofi")
 
 # check if file descriptor of stdin (0) is open or closed
 if [ ! -t 0 ]; then
-  while read x ; do OPTIONS="$OPTIONS$([ ! -z "$OPTIONS" ] && echo "\n")$x" ; done
+  while read -r x ; do OPTIONS="$OPTIONS$([ ! -z "$OPTIONS" ] && echo "\n")$x" ; done
 fi
 
 if $dmenuexists; then
@@ -58,8 +55,7 @@ if $dmenuexists; then
         check=$(dmenu_argument_check "$1")
         if [[ ! -z "$check" ]]; then
           if [[ "$check" = "true" ]]; then
-            # TODO fix this to keep spaces
-            [[ ! -z "$1" ]] && [[ ! -z "$2" ]] && dmenuargs+=("$1 $(printf "%q" $2)")
+            [[ ! -z "$1" ]] && [[ ! -z "$2" ]] && dmenuargs+=("$1 $(echo $2 | sed 's/ /:/g')")
             # Remove argument name value from processing
             # which means next shift will remove argument value from processing
             shift
@@ -75,9 +71,9 @@ if $dmenuexists; then
   done
 
   if [[ ! -z "$OPTIONS" ]]; then 
-    echo -e "$OPTIONS" | dmenu ${dmenuargs[*]}
+    eval "echo -e $(printf '%q' "$OPTIONS") | dmenu $(echo -e ${dmenuargs[*]} | sed -e 's/\([^ ]*:[^ ]*\)/\"\1\"/g; s/\:/\ /g')"
   else
-    dmenu ${dmenuargs[*]} <&-
+    eval "dmenu $(echo -e ${dmenuargs[*]} | sed -e 's/\([^ ]*:[^ ]*\)/\"\1\"/g; s/\:/\ /g') <&-"
   fi
 
   exit
@@ -90,31 +86,33 @@ if $rofiexists; then
   do
     case $argument in
       -wi)
-        [[ ! -z "$2" ]] && rofiargs+=("-width $(printf "%q" $2)")
-        shift # Remove argument name from processing
-        shift # Remove argument value from processing
+        [[ ! -z "$2" ]] && rofiargs+=("-width $(echo $2 | sed 's/ /:/g')")
+        # Remove argument name value from processing
+        # which means next shift will remove argument value from processing
+        shift
       ;;
       -P)
         rofiargs+=("-password")
-        shift # Remove argument name from processing
       ;;
       *)
         if [[ $2 == -* ]]; then
           [[ ! -z "$1" ]] && rofiargs+=("$1")
-          shift # Remove argument name from processing
         else
-          [[ ! -z "$1" ]] && [[ ! -z "$2" ]] && rofiargs+=("$1 $(printf "%q" $2)")
-          shift # Remove argument name from processing
-          shift # Remove argument value from processing
+          [[ ! -z "$1" ]] && [[ ! -z "$2" ]] && rofiargs+=("$1 $(echo $2 | sed 's/ /:/g')")
+          # Remove argument name value from processing
+          # which means next shift will remove argument value from processing
+          shift
         fi
       ;;
     esac
+
+    shift # Remove argument name from processing
   done
 
   if [[ ! -z "$OPTIONS" ]]; then 
-    echo -e "$OPTIONS" | rofi -dmenu ${rofiargs[*]}
+    eval "echo -e $(printf '%q' "$OPTIONS") | rofi -dmenu $(echo -e ${rofiargs[*]} | sed -e 's/\([^ ]*:[^ ]*\)/\"\1\"/g; s/\:/\ /g')"
   else
-      rofi -dmenu ${rofiargs[*]} -lines 0
+    eval "rofi -lines 0 -dmenu $(echo -e ${rofiargs[*]} | sed -e 's/\([^ ]*:[^ ]*\)/\"\1\"/g; s/\:/\ /g') <&-"
   fi
 
   exit
