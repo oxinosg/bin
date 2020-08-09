@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Script to execute dynamic menu (dmenu/rofi).
+# Accepts dmenu flag arguments and verifies if the patch that enabled that argument exists.
+
 # In case both applications are installed, you can set up a preference with
 # $DYNAMIC_MENU="dmenu"
 # $DYNAMIC_MENU="rofi"
@@ -71,6 +74,7 @@ if $dmenuexists; then
   done
 
   if [[ ! -z "$OPTIONS" ]]; then 
+    # add quotes around dmenuargs value parameters if they have spaces in them
     eval "echo -e $(printf '%q' "$OPTIONS") | dmenu $(echo -e ${dmenuargs[*]} | sed -e 's/\([^ ]*:[^ ]*\)/\"\1\"/g; s/\:/\ /g')"
   else
     eval "dmenu $(echo -e ${dmenuargs[*]} | sed -e 's/\([^ ]*:[^ ]*\)/\"\1\"/g; s/\:/\ /g') <&-"
