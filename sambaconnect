@@ -2,13 +2,10 @@
 
 # Script to connect/disconnect to Samba Folder in your network
 
-# Check if dependancies exist
-dmenu -v >/dev/null || exit # dmenu with password patch installed
-
-admin_pass=$(dmenu -P -p "Enter admin password" <&-)
+admin_pass=$(dmenuwrap -P -p "Enter admin password")
 
 if [[ ! -z "$(ls -A /mnt/smb/)" ]]; then
-  disconnect=$(echo -e "No\\nYes" | dmenu -p "Disconnect Samba Folder?")
+  disconnect=$(echo -e "No\\nYes" | dmenuwrap -p "Disconnect Samba Folder?")
 
   [[ "$disconnect" = "Yes" ]] && echo "$admin_pass" | sudo -S umount /mnt/smb && notify-send " Folder Disconnected"
 
@@ -27,13 +24,13 @@ while read line; do
   options="$options\n$line - $name"
 done <<< "$addresses"
 
-address=$(echo -e "$options" | dmenu -i -p "Select address" | cut -d ' ' -f 1)
+address=$(echo -e "$options" | dmenuwrap -i -p "Select address" | cut -d ' ' -f 1)
 
 [[ -z "$address" ]] && exit
 
-password=$(dmenu -P -p "Enter password" <&-)
+password=$(dmenuwrap -P -p "Enter password")
 folders=$(smbclient -L "$address" -U "user%$password" | grep -P '\t' | sed 's/^.//' | cut -d ' ' -f 1 | sed '1,2d' | head -n -1)
-folder=$(echo -e "$folders" | dmenu -i -p "Select address" | cut -d ' ' -f 1)
+folder=$(echo -e "$folders" | dmenuwrap -i -p "Select address" | cut -d ' ' -f 1)
 
 [[ -z "$folder" ]] && exit
 

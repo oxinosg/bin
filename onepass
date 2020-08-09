@@ -5,14 +5,13 @@
 # Check if dependencies exist
 xclip -version >/dev/null || exit
 stvars >/dev/null || exit
-dmenu -v >/dev/null || exit # dmenu with password patch installed
 op -v >/dev/null || exit
 jq --version >/dev/null || exit
 
 token=$(stvars get onetoken)
 
 gettoken() {
-  key=$(dmenu -P -p "Enter master key" <&-)
+  key=$(dmenuwrap -P -p "Enter master key")
   
   [[ -z "$key" ]] && exit
   
@@ -32,7 +31,7 @@ if [[ ! -z "$status" ]]; then
   items=$(op list items --session "$token" 2>&1)
 fi
 
-chosen=$(echo "$items" | jq '.[].overview.title' -r | dmenu -i -p "Get password for")
+chosen=$(echo "$items" | jq '.[].overview.title' -r | dmenuwrap -i -p "Get password for")
 [[ -z "$chosen" ]] && exit
 
 password=$(op get item $chosen --session "$token" --fields password)

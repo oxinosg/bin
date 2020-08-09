@@ -3,7 +3,7 @@
 # Script to connect to bluetooth device
 # TODO at some point should fix this one
 
-power=$(echo -e "On\nOff" | dmenu -i -p "Power on/off bluetooth")
+power=$(echo -e "On\nOff" | dmenuwrap -i -p "Power on/off bluetooth")
 
 if [[ $power == "On" ]]; then
   bluetoothctl -- power on
@@ -13,7 +13,7 @@ if [[ $power == "On" ]]; then
   paired=$(bluetoothctl -- paired-devices)
 
   # show list of paired devices and a "New" option
-  device=$(echo -e "New\n$paired" | dmenu -i -p "Select paired device to connect")
+  device=$(echo -e "New\n$paired" | dmenuwrap -i -p "Select paired device to connect")
   [[ -z "$device" ]] && exit
 
   if [[ $device == "New" ]]; then
@@ -21,7 +21,7 @@ if [[ $power == "On" ]]; then
     timeout 10s bluetoothctl -- scan on
     bluetoothctl -- scan off
     devices=$(bluetoothctl -- devices)
-    device=$(echo "$devices" | dmenu -i -wi 1400 -l 30 -p "Select device to connect")
+    device=$(echo "$devices" | dmenuwrap -i -wi 1400 -l 30 -p "Select device to connect")
     [[ -z "$device" ]] && exit
 
     bluetoothctl -- pair "$(echo "$device" | cut -d' ' -f2))"

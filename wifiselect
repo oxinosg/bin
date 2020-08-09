@@ -2,10 +2,10 @@
 
 # Script to connect to wifi
 
-wifi=$(nmcli d wifi list | dmenu -i -wi 1400 -l 30 -p "Select wifi to connect" | sed 's/ \{2,\}/:/g' | cut -d : -f2)
+wifi=$(nmcli d wifi list | dmenuwrap -i -wi 1400 -l 30 -p "Select wifi to connect" | sed 's/ \{2,\}/:/g' | cut -d : -f2)
 [[ -z "$wifi" ]] && exit
 
-password=$(dmenu -p "Enter wifi password" <&-)
+password=$(dmenuwrap -p "Enter wifi password" <&-)
 
 if [[ ! -z "$wifi" ]]; then
   echo "$wifi"

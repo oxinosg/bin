@@ -1,0 +1,123 @@
+#!/bin/bash
+
+PASSWORD=false
+CASE_INSENSITIVELY=false
+
+# In case both applications are installed, you can set up a preference with
+# $DYNAMIC_MENU="dmenu"
+# $DYNAMIC_MENU="rofi"
+exists() {
+  if [[ ! -z "$DYNAMIC_MENU" ]]; then
+    [[ "$DYNAMIC_MENU" = "$1" ]] && echo true || echo false
+  else
+    /bin/sh -c "type $1 >/dev/null" && echo true || echo false
+  fi
+}
+
+get_dmenu_accepted_agruments() {
+  arguments=$(dmenu -h 2>&1 | grep -Po "(?<=\[).*?(?=\])" | cut -d' ' -f1)
+  arguments_bool=$(echo "$arguments" | head -1 | cut -c2-)
+  arguments=$(echo "$arguments" | tail -n +2)
+}
+
+# check if dmenu has patch applied which accepts flag
+dmenu_argument_check() {
+  local arg="$(echo "$1" | cut -c2-)"
+
+  if [[ ! -z "$(echo "$arguments" | grep -w "$arg")" ]]; then 
+    echo "true" # if exact match exists means flag accepts value
+  elif [[ ! -z "$(echo "$arguments_bool" | head -1 | grep "$arg")" ]]; then
+    echo "bool" # if match on the first line of args only, means bool flag
+  else
+    notify-send -t 5000 "⚠  dmenu missing patch which accepts $arg"
+  fi
+}
+
+dmenuexists=$(exists "dmenu")
+rofiexists=$(exists "rofi")
+
+# check if file descriptor of stdin (0) is open or closed
+if [ ! -t 0 ]; then
+  while read x ; do OPTIONS="$OPTIONS$([ ! -z "$OPTIONS" ] && echo "\n")$x" ; done
+fi
+
+if $dmenuexists; then
+  get_dmenu_accepted_agruments
+
+  dmenuargs=()
+
+  # Loop through arguments and process them
+  for argument in "$@"
+  do
+    case $argument in
+      "\-P")
+        dmenuargs+=("-P")
+        shift # Remove argument name from processing
+      ;;
+      *)
+        check=$(dmenu_argument_check "$1")
+        if [[ ! -z "$check" ]]; then
+          if [[ "$check" = "true" ]]; then
+            # TODO fix this to keep spaces
+            [[ ! -z "$1" ]] && [[ ! -z "$2" ]] && dmenuargs+=("$1 $(printf "%q" $2)")
+            # Remove argument name value from processing
+            # which means next shift will remove argument value from processing
+            shift
+
+          elif [[ "$check" = "bool" ]]; then
+            [[ ! -z "$1" ]] && dmenuargs+=("$1")
+          fi
+        fi
+      ;;
+    esac
+
+    shift # Remove argument name from processing
+  done
+
+  if [[ ! -z "$OPTIONS" ]]; then 
+    echo -e "$OPTIONS" | dmenu ${dmenuargs[*]}
+  else
+    dmenu ${dmenuargs[*]} <&-
+  fi
+
+  exit
+fi
+
+if $rofiexists; then
+  rofiargs=()
+
+  for argument in "$@"
+  do
+    case $argument in
+      -wi)
+        [[ ! -z "$2" ]] && rofiargs+=("-width $(printf "%q" $2)")
+        shift # Remove argument name from processing
+        shift # Remove argument value from processing
+      ;;
+      -P)
+        rofiargs+=("-password")
+        shift # Remove argument name from processing
+      ;;
+      *)
+        if [[ $2 == -* ]]; then
+          [[ ! -z "$1" ]] && rofiargs+=("$1")
+          shift # Remove argument name from processing
+        else
+          [[ ! -z "$1" ]] && [[ ! -z "$2" ]] && rofiargs+=("$1 $(printf "%q" $2)")
+          shift # Remove argument name from processing
+          shift # Remove argument value from processing
+        fi
+      ;;
+    esac
+  done
+
+  if [[ ! -z "$OPTIONS" ]]; then 
+    echo -e "$OPTIONS" | rofi -dmenu ${rofiargs[*]}
+  else
+      rofi -dmenu ${rofiargs[*]} -lines 0
+  fi
+
+  exit
+fi
+
+notify-send "⚠ Install either dmenu or rofi!"
