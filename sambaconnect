@@ -36,4 +36,4 @@ folder=$(echo -e "$folders" | dmenuwrap -i -p "Select address" | cut -d ' ' -f 1
 
 [[ -z "$folder" ]] && exit
 
-echo "$admin_pass" | sudo -S mount -t cifs -o rw,username=user,"$([[ -z "$password" ]] && echo ",password=$password")"uid="$(id -u "$(whoami)")" //"$address"/"$folder" /mnt/smb/ && notify-send " Folder connected at /mnt/smb"
+echo "$admin_pass" | sudo -S mount -t cifs -o rw,username=user,password="$password",uid="$(id -u "$(whoami)")" //"$address"/"$folder" /mnt/smb/ && notify-send " Folder connected at /mnt/smb"
