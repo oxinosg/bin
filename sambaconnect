@@ -24,14 +24,16 @@ while read line; do
   options="$options\n$line - $name"
 done <<< "$addresses"
 
-address=$(echo -e "$options" | dmenuwrap -i -p "Select address" | cut -d ' ' -f 1)
+# if only one line in addresses, don't prompt
+[ "$(echo "$addresses" | wc -l)" = "1" ] && address="$addresses" || address=$(echo -e "$options" | dmenuwrap -i -p "Select address" | cut -d ' ' -f 1)
 
 [[ -z "$address" ]] && exit
 
-password=$(dmenuwrap -P -p "Enter password")
-folders=$(smbclient -L "$address" -U "user%$password" | grep -P '\t' | sed 's/^.//' | cut -d ' ' -f 1 | sed '1,2d' | head -n -1)
+password=""
+folders=$(smbclient -L "$address" -U "user%" || (password=$(dmenuwrap -P -p "Enter password"); smbclient -L "$address" -U "user%$password"))
+folders=$(echo -e "$folders" | grep -P '\t' | sed 's/^.//' | cut -d ' ' -f 1 | sed '1,2d' | head -n -1 || smbclient -L "$address" -U "user%$password" | grep -P '\t' | sed 's/^.//' | cut -d ' ' -f 1 | sed '1,2d' | head -n -1)
 folder=$(echo -e "$folders" | dmenuwrap -i -p "Select address" | cut -d ' ' -f 1)
 
 [[ -z "$folder" ]] && exit
 
-echo "$admin_pass" | sudo -S mount -t cifs -o rw,username=user,uid="$(id -u "$(whoami)")" //"$address"/"$folder" /mnt/smb/ && notify-send " Folder connected at /mnt/smb"
+echo "$admin_pass" | sudo -S mount -t cifs -o rw,username=user,"$([[ -z "$password" ]] && echo ",password=$password")"uid="$(id -u "$(whoami)")" //"$address"/"$folder" /mnt/smb/ && notify-send " Folder connected at /mnt/smb"
