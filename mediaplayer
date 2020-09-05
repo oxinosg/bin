@@ -1,0 +1,159 @@
+#!/bin/bash
+
+# Media player script xD
+# renames file to be played and adds a _ at the end to help you remember where you left off
+# can be used to open folder which searches for last played file.
+# if vlc remembers position, continue that file, otherwise play next one
+
+input="$1"
+
+[ -z "$input" ] && echo "no input file" && exit;
+
+isfolder=false
+getnext=false
+fileset=false
+
+[ -d "$input" ] && isfolder=true
+
+currentpath=$($isfolder && echo "$input/" || echo "$PWD/")
+
+selectFile() {
+    local f="$1"
+
+    # remove _ from previous file and set as selected the current file
+    filename=$(basename -- "$f")
+    extension="${filename##*.}"
+    filename="${filename%.*}"
+    name="$(echo $filename | sed 's/\_$//')"
+    dir_name="$(dirname "$f")"
+
+    mv "$f" "$dir_name/${name}.${extension}"
+
+    selectedfile="$dir_name/${name}.${extension}"
+    selectedfilename="$(basename -- "$selectedfile")"
+    fileset=true
+}
+
+if $isfolder; then
+    # list all files in same folder that end with _
+    files=$(find "$currentpath." -name '*_.*')
+    SAVEIFS=$IFS   # Save current IFS
+    IFS=$'\n'      # Change IFS to new line
+    files=($files) # split to array $files
+    IFS=$SAVEIFS   # Restore IFS
+
+    [ -z "$files" ] && echo "files to rename empty" && exit
+
+    selectedfile="$(printf '%s\n' "${files[@]}" | grep ".*_." | tail -n 1)"
+    selectedfilename=$(basename -- "$selectedfile")
+
+    # remove _ from files
+    for i in "${files[@]}"
+    do
+        filename=$(basename -- "$i")
+        dir_name="$(dirname "$i")"
+
+        if [ ! "$selectedfilename" = "$filename" ]; then
+            extension="${filename##*.}"
+            filename="${filename%.*}"
+            name="$(echo $filename | sed 's/\_$//')"
+
+            [ ! "$name" = "$filename" ] && mv "$i" "$dir_name/${name}.${extension}"
+        fi
+    done
+
+    # list all video files in order to find next file to play
+    files=$(find "$currentpath." -type f | grep ".mkv\|.mp4\|.avi")
+    SAVEIFS=$IFS   # Save current IFS
+    IFS=$'\n'      # Change IFS to new line
+    files=($files) # split to array $files
+    IFS=$SAVEIFS   # Restore IFS
+
+    [ -z "$files" ] && echo "file list empty" && exit
+
+    # sorts array alphabetically
+    readarray -t files < <(printf '%s\0' "${files[@]}" | sort -z | xargs -0n1)
+
+    for i in "${files[@]}"
+    do
+        filename=$(basename -- "$i")
+        dir_name="$(dirname "$i")"
+        forcerename=false
+
+        if $isfolder; then
+            if $getnext; then
+                selectFile "$i"
+                getnext=false
+                fileset=true
+            fi
+
+            if ! $fileset && [ "$selectedfilename" = "$filename" ]; then
+                vlcqt=$(grep "\[RecentsMRL\]" -A 2 "$HOME/.config/vlc/vlc-qt-interface.conf")
+                vlcqtfiles=$(echo "$vlcqt" | grep "list=.*" | sed 's/list=//g')
+                IFS=', ' read -r -a vlcqtfiles <<< "$vlcqtfiles"
+                vlcqttimes=$(echo "$vlcqt" | grep "times=.*" | sed 's/times=//g')
+                IFS=', ' read -r -a vlcqttimes <<< "$vlcqttimes"
+
+                recentlyplayed=false
+                playedtime=0
+
+                for i in "${!vlcqtfiles[@]}"
+                do
+                    if [[ ${vlcqtfiles[i]} == *"$selectedfilename"* ]]; then
+                        recentlyplayed=true
+                        playedtime=${vlcqttimes[i]}
+                    fi
+                done
+
+                $recentlyplayed && [ "$playedtime" -gt 10 ] && selectFile "$selectedfile" fileset=true || getnext=true
+            fi
+        fi
+
+        # TODO split this one out
+        if [ ! "$selectedfilename" = "$filename" ]; then
+            extension="${filename##*.}"
+            filename="${filename%.*}"
+            name="$(echo $filename | sed 's/\_$//')"
+
+            [ ! "$name" = "$filename" ] && mv "$i" "$dir_name/${name}.${extension}"
+        fi
+
+        $fileset && break
+    done
+else
+    # list all files in same folder that end with _
+    files=$(find "$currentpath." -maxdepth 1 -name '*_.*')
+    SAVEIFS=$IFS   # Save current IFS
+    IFS=$'\n'      # Change IFS to new line
+    files=($files) # split to array $files
+    IFS=$SAVEIFS   # Restore IFS
+
+    selectedfile="$input"
+    selectedfilename=$(basename -- "$selectedfile")
+
+    for i in "${files[@]}"
+    do
+        filename=$(basename -- "$i")
+        dir_name="$(dirname "$i")"
+
+        if [ ! "$selectedfilename" = "$filename" ]; then
+            extension="${filename##*.}"
+            filename="${filename%.*}"
+            name="$(echo $filename | sed 's/\_$//')"
+
+            [ ! "$name" = "$filename" ] && mv "$i" "$dir_name/${name}.${extension}"
+        fi
+    done
+fi
+
+dir_name="$(dirname "$selectedfile")"
+extension="${selectedfilename##*.}"
+selectedfilename="${selectedfilename%.*}"
+name="$(echo $selectedfilename | sed 's/\_$//')"
+
+[[ "$selectedfilename" = *_ ]] || mv "$dir_name/${selectedfilename}.${extension}" "$dir_name/${name}_.${extension}"
+
+# remove /./ from file path, so that the recent played string in vlc is without that
+filetoplay=$(echo "$dir_name/${name}_.${extension}" | sed 's/\/\.\//\//g')
+
+vlc "$filetoplay"
