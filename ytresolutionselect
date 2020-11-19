@@ -1,0 +1,48 @@
+#!/bin/bash
+
+[[ -z "$1" ]] \
+  && notify-send -t 5000 "⚠ Pass a youtube link as the first argument" \
+  && exit
+
+ytl="$(youtube-dl -F "$1" 2>&1)"
+resolutions="$(echo "$ytl" | grep '^[0-9]')"
+
+[[ -z "$resolutions" ]] \
+  && notify-send -t 0 "⚠ $ytl" \
+  && exit
+
+varesolutions="$(echo "$resolutions" | grep -v only)"
+vresolutions="$(echo "$resolutions" | grep video)"
+aresolutions="$(echo "$resolutions" | grep audio)"
+
+linecount=$(echo "$resolutions" | wc -l)
+[ "$linecount" -gt "1" ] && linecount=40
+
+chosen=$(echo -e "no video\n$vresolutions\n$varesolutions" | tac | dmenuwrap -i -p "Select quality" -wi 1600 -l "$linecount")
+[[ -z "$chosen" ]] && exit
+
+if [[ $varesolutions == *"$chosen"* ]]; then
+  resolution=$(echo "$chosen" | cut -d ' ' -f1)
+
+elif [[ $vresolutions == *"$chosen"* ]]; then
+  videores=$(echo "$chosen" | cut -d ' ' -f1)
+
+  chosen=$(echo -e "no audio\n$aresolutions" | tac | dmenuwrap -i -p "Select audio quality" -wi 1600 -l "$linecount")
+  [[ -z "$chosen" ]] && exit
+
+  if [[ $chosen == "no audio" ]]; then
+    resolution=$videores
+  else
+    audiores=$(echo "$chosen" | cut -d ' ' -f1) 
+    resolution=$videores+$audiores
+  fi
+
+elif [[ $chosen == "no video" ]]; then
+  chosen=$(echo -e "$aresolutions" | tac | dmenuwrap -i -p "Select audio quality" -wi 1600 -l "$linecount")
+  [[ -z "$chosen" ]] && exit
+
+  audiores=$(echo "$chosen" | cut -d ' ' -f1) 
+  resolution=$audiores
+fi
+
+setsid mpv --ytdl-format="\'$resolution\'" --force-window --input-ipc-server=/tmp/mpvsoc$(date +%s) -quiet "$1" >/dev/null 2>&1 &

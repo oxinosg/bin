@@ -7,3 +7,4 @@ Useful Scripts
  - [sambaconnect](/sambaconnect) - Script to connect/disconnect to Samba Folder in your network
  - [sourceupdates](/sourceupdates) - Script to check tool repositories if they have new release tags. Repositories located in $HOME/tools are tools installed from source.
  - [wifiselect](/wifiselect) - Script to connect to wifi
+ - [ytresolutionselect](/ytresolutionselect) - Script to select resolution of video/audio link before playing it with mpv
