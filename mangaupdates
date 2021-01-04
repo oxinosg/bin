@@ -1,0 +1,177 @@
+#!/bin/bash
+
+# cli to check if new manga chapters have been released
+# creates a file to keep track of latest chapter for each manga & if it's read
+
+FILE="$HOME/.manga" # [name],[unread],[latest chapter]
+
+declare -A site_sl=(
+    [name]='solo_leveling'
+    [website]='mangaread'
+    [manga_id]='1883'
+    [url]='https://readsololeveling.org/'
+)
+declare -A site_op=(
+    [name]='one_piece'
+    [website]='mangaplus'
+    [manga_id]='100020'
+    [url]='https://mangaplus.shueisha.co.jp/titles/100020'
+)
+declare -A site_tog=(
+    [name]='tower_of_god'
+    [website]='webtoon'
+    [manga_id]='95'
+    [url]='https://www.webtoons.com/en/fantasy/tower-of-god/list?title_no=95'
+)
+
+declare -n site
+declare -a completed_sites=()
+
+finish() {
+    tput cnorm # show cursor
+}
+
+trap finish EXIT
+tput civis # hide cursor
+
+[ ! -f "$FILE" ] && cd "$(dirname "$FILE")" && touch "$(basename -- $FILE)"
+
+times=1
+sleep_duration=60
+titles=""
+
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    -n|--names)
+      titles="$(echo "$2" | sed 's/, /\\|/' | sed 's/  */_/' | sed 's/,/\\|/')"
+      ;;
+    -s|--sleep)
+      sleep_duration=$2
+      ;;
+    -t|--times)
+      [[ "$2" =~ ^[0-9]+$ ]] && times=$(expr $2 + 0)
+      ;;
+    -l|--list)
+      titles=""
+      [[ $2 = -* ]] || titles="$2"
+      for s in ${!site@}; do
+        declare -n site=$s
+
+        if [[ ! -z "$titles" ]] && [[ -z "$(echo "${site[name]}" | sed '/\('"$titles"'\)/!s/.*//')" ]]; then
+          unset -n site
+          continue
+        fi
+
+        echo -e "${site[name]} ${site[url]}"
+      done
+
+      exit
+      ;;
+    -h|--help)
+      echo "-n | --names: manga to check, separated by ','          [all]"
+      echo "-s | --sleep: how long to sleep between each execution  [1 minute]"
+      echo "-t | --times: how many times to execute                 [1 time]"
+      echo "-l | --list:  list mangas and their urls"
+      echo "-h | --help:  this"
+      echo ""
+      echo "Manga to check:"
+      echo "---------------"
+
+      for s in ${!site@}; do
+        declare -n site=$s
+        echo "$(echo "${site[name]}" | sed 's/_/ /g')"
+      done
+
+      exit
+      ;;
+  esac
+  shift
+done
+
+while true; do
+  clear
+  all_completed=true
+
+  for s in ${!site@}; do
+      declare -n site=$s
+
+      if [[ ! -z "$titles" ]] && [[ -z "$(echo "${site[name]}" | sed '/\('"$titles"'\)/!s/.*//')" ]]; then
+        unset -n site
+        continue
+      fi
+
+      if [[ " ${completed_sites[@]} " =~ " ${site[name]} " ]]; then
+        printf "%-30s ready!!!!!!\n" "$(echo "${site[name]}" | sed 's/_/ /g')"
+        unset -n site
+        continue
+      fi
+
+      stored_data=$(cat "$FILE" | grep "${site[name]}")
+      unread=$(echo "$stored_data" | cut -d ',' -f 2)
+      new_chapter=false
+
+      if [[ "$unread" = 'true' ]]; then
+        new_chapter=true
+      else
+        case ${site[website]} in
+          mangaread)
+            latest_chapter="$(curl 'https://www.mangaread.org/wp-admin/admin-ajax.php' --silent \
+              --data-raw 'action=manga_get_chapters&manga='"${site[manga_id]}"'' \
+              | grep -oE 'Chapter [0-9.]+' \
+              | head -n 1)"
+            ;;
+
+          mangaplus)
+            # --text is used to `Process a binary file as if it were text; 
+            # this is equivalent to the --binary-files=text option`
+            # needed because jumpg-webapi.tokyo-cdn.com was treated as binary
+            latest_chapter="$(curl "https://jumpg-webapi.tokyo-cdn.com/api/title_detail?title_id=${site[manga_id]}" -silent \
+              | grep --text -oE '#[0-9]{3}|#[0-9]{4}' \
+              | tail -n 1)"
+            ;;
+
+          webtoon)
+            latest_chapter="$(curl "${site[url]}" --silent \
+             | grep -oE 'episode_no=[0-9]+' \
+             | head -n 1)"
+            ;;
+
+          *)
+            new_chapter="$(curl -silent "${site[url]}" | grep --text "${site[placeholder]}")"
+            [[ ! -z "$new_chapter" ]] && new_chapter=true || new_chapter=false
+            ;;
+        esac
+
+        saved_chapter=$(echo "$stored_data" | cut -d ',' -f 3)
+
+        if [[ ! " $latest_chapter " =~ " $saved_chapter " ]]; then
+          new_chapter=true
+          if [[ -z "$stored_data" ]]; then
+            echo "${site[name]},true,$latest_chapter" >> "$FILE"
+          else
+            sed -i -e "s/${site[name]}.*/${site[name]},true,$latest_chapter/" "$FILE"
+          fi
+        fi
+      fi
+
+      if $new_chapter; then
+        completed_sites+=("${site[name]}")
+        printf "%-30s ready!!!!!!\n" "$(echo "${site[name]}" | sed 's/_/ /g')"
+      else
+        all_completed=false
+        printf "%-30s not yet :'(\n" "$(echo "${site[name]}" | sed 's/_/ /g')"
+      fi
+
+      unset -n site
+  done
+
+  if $all_completed; then
+    break
+  fi
+
+  ((times--))
+
+  [ "$times" -lt 1 ] && break
+
+  sleep $sleep_duration
+done;
